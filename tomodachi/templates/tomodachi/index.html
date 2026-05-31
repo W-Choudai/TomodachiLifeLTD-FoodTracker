@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <title>Tomodachi Food Calculator</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,11 +73,11 @@
     }
     .top-bar h1 { font-size: 18px; font-weight: 600; }
     .top-bar .delete-btn {
-      padding: 6px 14px; background: none;
-      border: 1px solid #e74c3c; color: #e74c3c;
+      padding: 6px 14px; background: #ff8a00;
+      border: 1px solid #e74c3c; color: #ffffff;
       border-radius: 6px; font-size: 12px; cursor: pointer;
     }
-    .top-bar .delete-btn:hover { background: #fdecea; }
+    .top-bar .delete-btn:hover { background: #e74c3c; }
 
     /* ── Category score summary bar ── */
     .score-summary {
@@ -165,10 +166,11 @@
       padding: 12px 14px; border: 1px solid #e8e8e8;
       transition: border-color .15s;
     }
-    .food-card.has-pref { border-left: 3px solid #27ae60; }
+    .food-card.has-pref { border-left: 3px solid #ff8a00; }
     .food-top { display: flex; align-items: flex-start; justify-content: space-between; }
     .food-name { font-size: 13px; font-weight: 600; }
     .food-flavor { font-size: 10px; color: #01334f; margin-top: 2px; margin-bottom: 8px; }
+    .food-temp-icon { font-size: 14px; flex-shrink: 0; }
     .food-icon { font-size: 18px; line-height: 1; }
     .pref-row { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 6px; }
     .pref-btn {
@@ -290,13 +292,21 @@
                 <div class="food-name">{{ food.name }}</div>
                 {% if food.flavor %}<div class="food-flavor">{{ food.flavor }}</div>{% endif %}
               </div>
-              {% if food.icon %}<div class="food-icon">{{ food.icon }}</div>{% endif %}
+              <div class="food-temp-icon">
+                {% if food.temperature == "Hot" %}
+                  <i class="fa-solid fa-fire" style="color:#e74c3c;" title="Hot"></i>
+                {% elif food.temperature == "Cool" %}
+                  <i class="fa-solid fa-snowflake" style="color:#3498db;" title="Cool"></i>
+                {% elif food.temperature == "Normal" %}
+                  <i class="fa-solid fa-circle-dot" style="color:#95a5a6;" title="Normal"></i>
+                {% endif %}
+              </div>
             </div>
             <div class="pref-row">
               {% for pref in prefs|slice:"1:" %}
-              <button class="pref-btn {% if food.preference == pref %}{{ pref|slugify }}{% endif %}"
+              <button class="pref-btn {% if food.preference == pref %}active-pref{% endif %}"
                       data-label="{{ pref }}"
-                      onclick="setPref(this, {{ food.id }}, '{{ pref }}', '{{ cat_name }}')">
+                      onclick="setPref(this, {{ food.id }}, this.dataset.label, '{{ cat_name }}')">
                 {{ pref }}
               </button>
               {% endfor %}
@@ -334,41 +344,41 @@ const WEIGHTS = {
   "Didn't Like": -1, "Really Didn't Like": -2, "Loathes": -5,
 };
 
-const PREF_CLASS = {
-  "Absolutely Love":    "sel-al",
-  "Really Like":        "sel-rl",
-  "Like (Jump)":        "sel-lj",
-  "Like":               "sel-l",
-  "Didn't Like":        "sel-dl",
-  "Really Didn't Like": "sel-rdl",
-  "Loathes":            "sel-lo",
+const PREF_COLORS = {
+  "Absolutely Love":    "#c0392b",
+  "Really Like":        "#e67e22",
+  "Like (Jump)":        "#27ae60",
+  "Like":               "#2980b9",
+  "Didn't Like":        "#7f8c8d",
+  "Really Didn't Like": "#8e44ad",
+  "Loathes":            "#7b241c",
 };
 
-function scoreClass(s, prefix) {
-  if (s === null || s === undefined) return prefix + "untested";
-  if (s >= 2)  return prefix + "high";
-  if (s >= 0)  return prefix + "mid";
-  if (s >= -2) return prefix + "low";
-  return prefix + "bad";
-}
-
 function setPref(btn, foodId, pref, catName) {
-  const card    = btn.closest(".food-card");
-  const allBtns = card.querySelectorAll(".pref-btn");
+  const card     = btn.closest(".food-card");
+  const allBtns  = card.querySelectorAll(".pref-btn");
   const isActive = card.dataset.pref === pref;
 
-  allBtns.forEach(b => b.className = "pref-btn");
+  // Reset all buttons
+  allBtns.forEach(b => {
+    b.classList.remove("active-pref");
+    b.style.background = "";
+    b.style.color = "";
+    b.style.borderColor = "";
+  });
   card.classList.remove("has-pref");
 
   let newPref = null;
   if (!isActive) {
-    btn.classList.add(PREF_CLASS[pref]);
+    btn.classList.add("active-pref");
+    btn.style.background   = PREF_COLORS[pref];
+    btn.style.color        = "white";
+    btn.style.borderColor  = PREF_COLORS[pref];
     newPref = pref;
     card.classList.add("has-pref");
   }
   card.dataset.pref = newPref || "";
 
-  // Recompute category score locally
   updateCategoryScore(catName);
   updateTotalCount();
 
@@ -377,13 +387,20 @@ function setPref(btn, foodId, pref, catName) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ food_id: foodId, preference: newPref }),
   }).then(r => r.json()).then(data => {
-    // Update all category badges from server response
     for (const [cat, score] of Object.entries(data.category_scores)) {
       setCategoryBadge(cat, score);
     }
   });
 
   applyFilters();
+}
+
+function scoreClass(s, prefix) {
+  if (s === null || s === undefined) return prefix + "untested";
+  if (s >= 2)  return prefix + "high";
+  if (s >= 0)  return prefix + "mid";
+  if (s >= -2) return prefix + "low";
+  return prefix + "bad";
 }
 
 function updateCategoryScore(catName) {
@@ -442,6 +459,20 @@ function applyFilters() {
     section.style.display = anyVisible ? "" : "none";
   });
 }
+
+document.querySelectorAll(".food-card").forEach(card => {
+  const pref = card.dataset.pref;
+  if (pref && PREF_COLORS[pref]) {
+    card.querySelectorAll(".pref-btn").forEach(btn => {
+      if (btn.dataset.label === pref) {
+        btn.classList.add("active-pref");
+        btn.style.background  = PREF_COLORS[pref];
+        btn.style.color       = "white";
+        btn.style.borderColor = PREF_COLORS[pref];
+      }
+    });
+  }
+});
 </script>
 </body>
 </html>
