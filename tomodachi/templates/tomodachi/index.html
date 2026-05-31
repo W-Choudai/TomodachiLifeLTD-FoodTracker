@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tomodachi Food Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #fcf2cf;
+      color: #2c3e50;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 230px; min-width: 230px;
+      background: #ffc500;
+      display: flex; flex-direction: column;
+      height: 100vh;
+    }
+    .sidebar-title {
+      padding: 18px 16px 10px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: .08em; color: #01334f;
+      text-transform: uppercase;
+      border-bottom: 1px solid #fdd776;
+    }
+    .mii-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .mii-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; cursor: pointer;
+      transition: background .15s; text-decoration: none;
+    }
+    .mii-item:hover { background: #ff8a00; }
+    .mii-item.active { background: #ff8a00; border-left: 3px solid #27ae60; }
+    .mii-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .mii-info { overflow: hidden; flex: 1; }
+    .mii-name { font-size: 13px; color: #ecf0f1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mii-sub  { font-size: 11px; color: #7f8c8d; margin-top: 1px; }
+    .mii-score-badge {
+      font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 8px; flex-shrink: 0;
+    }
+    .add-mii-form {
+      padding: 10px; border-top: 1px solid #fdd776;
+      display: flex; gap: 6px;
+    }
+    .add-mii-form input {
+      flex: 1; padding: 7px 10px; border-radius: 6px;
+      border: none; font-size: 13px;
+      background: #fdd776; color: #ecf0f1; outline: none;
+    }
+    .add-mii-form input::placeholder { color: #7f8c8d; }
+    .add-mii-form button {
+      padding: 7px 12px; background: #27ae60; color: white;
+      border: none; border-radius: 6px; font-size: 13px;
+      cursor: pointer; font-weight: 600;
+    }
+    .add-mii-form button:hover { background: #2ecc71; }
+
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .top-bar {
+      background: white; padding: 14px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .top-bar h1 { font-size: 18px; font-weight: 600; }
+    .top-bar .delete-btn {
+      padding: 6px 14px; background: none;
+      border: 1px solid #e74c3c; color: #e74c3c;
+      border-radius: 6px; font-size: 12px; cursor: pointer;
+    }
+    .top-bar .delete-btn:hover { background: #fdecea; }
+
+    /* ── Category score summary bar ── */
+    .score-summary {
+      background: white; border-bottom: 1px solid #e0e0e0;
+      padding: 10px 20px;
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
+    }
+    .score-summary-label {
+      font-size: 11px; font-weight: 700; color: #95a5a6;
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-right: 4px; white-space: nowrap;
+    }
+    .cat-score-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .cat-score-chip .chip-cat  { color: inherit; opacity: .75; }
+    .cat-score-chip .chip-val  { font-weight: 800; }
+    .cat-score-chip.untested   { background: #f5f5f5; color: #aaa; border-color: #e0e0e0; }
+    .cat-score-chip.score-high { background: #e8f8e8; color: #1e8449; border-color: #a9dfbf; }
+    .cat-score-chip.score-mid  { background: #eaf4fb; color: #1a6da0; border-color: #aed6f1; }
+    .cat-score-chip.score-low  { background: #f0f0f0; color: #555;    border-color: #ddd; }
+    .cat-score-chip.score-bad  { background: #fde8e4; color: #c0392b; border-color: #f1948a; }
+    .summary-total { font-size: 12px; color: #7f8c8d; margin-left: auto; white-space: nowrap; }
+
+    .toolbar {
+      padding: 10px 20px; display: flex; align-items: center;
+      gap: 10px; flex-wrap: wrap;
+      background: #fcf2cf; border-bottom: 1px solid #e0e0e0;
+    }
+    .toolbar input[type="text"] {
+      padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; width: 200px; outline: none; background: white;
+    }
+    .toolbar input:focus { border-color: #27ae60; }
+    .filter-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 4px 10px; border: 1px solid #ddd; border-radius: 20px;
+      font-size: 11px; cursor: pointer; background: white;
+      color: #7f8c8d; transition: all .15s; white-space: nowrap;
+    }
+    .filter-btn.active { font-weight: 700; color: white; border-color: transparent; }
+    .filter-btn[data-pref="All"].active              { background:#2c3e50; }
+    .filter-btn[data-pref="Absolutely Love"].active  { background:#c0392b; }
+    .filter-btn[data-pref="Really Like"].active      { background:#e67e22; }
+    .filter-btn[data-pref="Like (Jump)"].active      { background:#27ae60; }
+    .filter-btn[data-pref="Like"].active             { background:#2980b9; }
+    .filter-btn[data-pref="Didn't Like"].active      { background:#7f8c8d; }
+    .filter-btn[data-pref="Really Didn't Like"].active { background:#8e44ad; }
+    .filter-btn[data-pref="Loathes"].active          { background:#7b241c; }
+
+    .food-area { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .no-foods-msg { text-align:center; padding:60px 20px; color:#bdc3c7; font-size:14px; }
+
+    /* ── Category section ── */
+    .category-section { margin-bottom: 28px; }
+    .category-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px; padding-bottom: 8px;
+      border-bottom: 1px solid #fdd776;
+    }
+    .category-name {
+      font-size: 11px; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; color: #ff8a00;
+    }
+    .category-score-badge {
+      font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: 12px;
+    }
+    .csb-untested { background:#f5f5f5; color:#aaa; }
+    .csb-high     { background:#e8f8e8; color:#1e8449; }
+    .csb-mid      { background:#eaf4fb; color:#1a6da0; }
+    .csb-low      { background:#f0f0f0; color:#555; }
+    .csb-bad      { background:#fde8e4; color:#c0392b; }
+
+    .food-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 10px;
+    }
+    .food-card {
+      background: #ffc500; border-radius: 10px;
+      padding: 12px 14px; border: 1px solid #e8e8e8;
+      transition: border-color .15s;
+    }
+    .food-card.has-pref { border-left: 3px solid #27ae60; }
+    .food-top { display: flex; align-items: flex-start; justify-content: space-between; }
+    .food-name { font-size: 13px; font-weight: 600; }
+    .food-flavor { font-size: 10px; color: #01334f; margin-top: 2px; margin-bottom: 8px; }
+    .food-icon { font-size: 18px; line-height: 1; }
+    .pref-row { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 6px; }
+    .pref-btn {
+      padding: 3px 7px; border-radius: 4px;
+      border: 1px solid #e0e0e0; font-size: 10px;
+      cursor: pointer; background: #f5f5f5;
+      color: #7f8c8d; transition: all .15s; white-space: nowrap;
+    }
+    .pref-btn:hover { opacity: .8; }
+    .pref-btn.sel-al  { background:#c0392b; color:white; border-color:#c0392b; }
+    .pref-btn.sel-rl  { background:#e67e22; color:white; border-color:#e67e22; }
+    .pref-btn.sel-lj  { background:#27ae60; color:white; border-color:#27ae60; }
+    .pref-btn.sel-l   { background:#2980b9; color:white; border-color:#2980b9; }
+    .pref-btn.sel-dl  { background:#7f8c8d; color:white; border-color:#7f8c8d; }
+    .pref-btn.sel-rdl { background:#8e44ad; color:white; border-color:#8e44ad; }
+    .pref-btn.sel-lo  { background:#7b241c; color:white; border-color:#7b241c; }
+
+    .empty-msg { text-align:center; padding:80px 20px; color:#bdc3c7; font-size:15px; }
+    .empty-msg .big { font-size:40px; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-title">My Miis</div>
+  <div class="mii-list">
+    {% for mii in miis %}
+    {% with score=mii.happiness_score %}
+    <a href="{% url 'tomodachi:mii_detail' mii.id %}"
+       class="mii-item {% if active_mii and active_mii.id == mii.id %}active{% endif %}">
+      {% with ci=forloop.counter0 %}
+      <div class="mii-avatar" style="background:
+        {% if ci|divisibleby:7 %}#c0392b
+        {% elif ci|add:'-1'|divisibleby:7 %}#2980b9
+        {% elif ci|add:'-2'|divisibleby:7 %}#27ae60
+        {% elif ci|add:'-3'|divisibleby:7 %}#8e44ad
+        {% elif ci|add:'-4'|divisibleby:7 %}#e67e22
+        {% elif ci|add:'-5'|divisibleby:7 %}#16a085
+        {% else %}#607d8b{% endif %}">
+        {{ mii.name|slice:":2"|upper }}
+      </div>
+      {% endwith %}
+      <div class="mii-info">
+        <div class="mii-name">{{ mii.name }}</div>
+        <div class="mii-sub">{{ mii.preferences.count }} food{{ mii.preferences.count|pluralize }} set</div>
+      </div>
+    </a>
+    {% endwith %}
+    {% empty %}
+    <div style="padding:20px;font-size:13px;color:#7f8c8d;text-align:center">No Miis yet</div>
+    {% endfor %}
+  </div>
+  <form class="add-mii-form" method="post" action="{% url 'tomodachi:add_mii' %}">
+    {% csrf_token %}
+    <input type="text" name="name" placeholder="New Mii name…" required autocomplete="off"/>
+    <button type="submit">＋</button>
+  </form>
+</div>
+
+<div class="main">
+  {% if active_mii %}
+
+  <div class="top-bar">
+    <h1>{{ active_mii.name }}</h1>
+    <form method="post" action="{% url 'tomodachi:delete_mii' active_mii.id %}"
+          onsubmit="return confirm('Remove {{ active_mii.name }}?')">
+      {% csrf_token %}
+      <button class="delete-btn" type="submit">✕ Remove Mii</button>
+    </form>
+  </div>
+
+  <!-- Category score summary bar -->
+  <div class="score-summary" id="scoreSummary">
+    <span class="score-summary-label">Scores</span>
+    {% for cat_name, data in categories.items %}
+      {% with s=data.score %}
+      <span class="cat-score-chip {% if s is None %}untested{% elif s >= 2 %}score-high{% elif s >= 0 %}score-mid{% elif s >= -2 %}score-low{% else %}score-bad{% endif %}"
+            data-cat="{{ cat_name }}">
+        <span class="chip-cat">{{ cat_name }}</span>
+        <span class="chip-val">{% if s is None %}-{% else %}{{ s }}{% endif %}</span>
+      </span>
+      {% endwith %}
+    {% endfor %}
+    <span class="summary-total">{{ total_set }} preferences set</span>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="searchInput" placeholder="🔍  Search foods…" oninput="applyFilters()"/>
+    <div class="filter-group">
+      {% for pref in prefs %}
+      <button class="filter-btn {% if pref == 'All' %}active{% endif %}"
+              data-pref="{{ pref }}" onclick="setFilter('{{ pref }}')">{{ pref }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="food-area" id="foodArea">
+    {% if categories %}
+      {% for cat_name, data in categories.items %}
+      <div class="category-section" data-category="{{ cat_name }}">
+        <div class="category-header">
+          <span class="category-name">{{ cat_name }}</span>
+          {% with s=data.score %}
+          <span class="category-score-badge {% if s is None %}csb-untested{% elif s >= 2 %}csb-high{% elif s >= 0 %}csb-mid{% elif s >= -2 %}csb-low{% else %}csb-bad{% endif %}"
+                data-cat-badge="{{ cat_name }}">
+            {% if s is None %}not tried{% else %}{{ s }} / 5{% endif %}
+          </span>
+          {% endwith %}
+        </div>
+        <div class="food-grid">
+          {% for food in data.foods %}
+          <div class="food-card {% if food.preference %}has-pref{% endif %}"
+               data-food-id="{{ food.id }}"
+               data-cat="{{ cat_name }}"
+               data-name="{{ food.name|lower }}"
+               data-pref="{{ food.preference|default:'' }}">
+            <div class="food-top">
+              <div>
+                <div class="food-name">{{ food.name }}</div>
+                {% if food.flavor %}<div class="food-flavor">{{ food.flavor }}</div>{% endif %}
+              </div>
+              {% if food.icon %}<div class="food-icon">{{ food.icon }}</div>{% endif %}
+            </div>
+            <div class="pref-row">
+              {% for pref in prefs|slice:"1:" %}
+              <button class="pref-btn {% if food.preference == pref %}{{ pref|slugify }}{% endif %}"
+                      data-label="{{ pref }}"
+                      onclick="setPref(this, {{ food.id }}, '{{ pref }}', '{{ cat_name }}')">
+                {{ pref }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-foods-msg">
+        No foods in the database yet.<br><br>
+        Run <code>python manage.py import_foods your_file.xlsx</code> to import from Excel.
+      </div>
+    {% endif %}
+  </div>
+
+  {% else %}
+
+  <div class="top-bar"><h1>Tomodachi Food Calculator</h1></div>
+  <div class="empty-msg">
+    <div class="big">🍱</div>
+    <div>Select a Mii from the sidebar, or add one to get started.</div>
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+const MII_ID = "{{ active_mii.id|default:'' }}";
+let currentFilter = "All";
+
+const WEIGHTS = {
+  "Absolutely Love": 5, "Really Like": 2, "Like (Jump)": 1, "Like": 0,
+  "Didn't Like": -1, "Really Didn't Like": -2, "Loathes": -5,
+};
+
+const PREF_CLASS = {
+  "Absolutely Love":    "sel-al",
+  "Really Like":        "sel-rl",
+  "Like (Jump)":        "sel-lj",
+  "Like":               "sel-l",
+  "Didn't Like":        "sel-dl",
+  "Really Didn't Like": "sel-rdl",
+  "Loathes":            "sel-lo",
+};
+
+function scoreClass(s, prefix) {
+  if (s === null || s === undefined) return prefix + "untested";
+  if (s >= 2)  return prefix + "high";
+  if (s >= 0)  return prefix + "mid";
+  if (s >= -2) return prefix + "low";
+  return prefix + "bad";
+}
+
+function setPref(btn, foodId, pref, catName) {
+  const card    = btn.closest(".food-card");
+  const allBtns = card.querySelectorAll(".pref-btn");
+  const isActive = card.dataset.pref === pref;
+
+  allBtns.forEach(b => b.className = "pref-btn");
+  card.classList.remove("has-pref");
+
+  let newPref = null;
+  if (!isActive) {
+    btn.classList.add(PREF_CLASS[pref]);
+    newPref = pref;
+    card.classList.add("has-pref");
+  }
+  card.dataset.pref = newPref || "";
+
+  // Recompute category score locally
+  updateCategoryScore(catName);
+  updateTotalCount();
+
+  fetch(`/tomodachi/mii/${MII_ID}/preference/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ food_id: foodId, preference: newPref }),
+  }).then(r => r.json()).then(data => {
+    // Update all category badges from server response
+    for (const [cat, score] of Object.entries(data.category_scores)) {
+      setCategoryBadge(cat, score);
+    }
+  });
+
+  applyFilters();
+}
+
+function updateCategoryScore(catName) {
+  const cards = document.querySelectorAll(`.food-card[data-cat="${CSS.escape(catName)}"]`);
+  let total = 0, weightedSum = 0;
+  cards.forEach(c => {
+    const p = c.dataset.pref;
+    if (p && WEIGHTS[p] !== undefined) {
+      total++;
+      weightedSum += WEIGHTS[p];
+    }
+  });
+  const score = total === 0 ? null : Math.round((weightedSum / total) * 100) / 100;
+  setCategoryBadge(catName, score);
+}
+
+function setCategoryBadge(catName, score) {
+  // Update header badge
+  const badge = document.querySelector(`[data-cat-badge="${CSS.escape(catName)}"]`);
+  if (badge) {
+    badge.className = "category-score-badge " + scoreClass(score, "csb-");
+    badge.textContent = score === null ? "not tried" : `${score} / 5`;
+  }
+  // Update summary chip
+  const chip = document.querySelector(`.cat-score-chip[data-cat="${CSS.escape(catName)}"]`);
+  if (chip) {
+    chip.className = "cat-score-chip " + scoreClass(score, "score-");
+    chip.querySelector(".chip-val").textContent = score === null ? "-" : score;
+  }
+}
+
+function updateTotalCount() {
+  const total = document.querySelectorAll(".food-card[data-pref]:not([data-pref=''])").length;
+  const el = document.querySelector(".summary-total");
+  if (el) el.textContent = `${total} preferences set`;
+}
+
+function setFilter(pref) {
+  currentFilter = pref;
+  document.querySelectorAll(".filter-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.pref === pref)
+  );
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = (document.getElementById("searchInput")?.value || "").toLowerCase();
+  document.querySelectorAll(".category-section").forEach(section => {
+    let anyVisible = false;
+    section.querySelectorAll(".food-card").forEach(card => {
+      const show = card.dataset.name.includes(q) &&
+                   (currentFilter === "All" || card.dataset.pref === currentFilter);
+      card.style.display = show ? "" : "none";
+      if (show) anyVisible = true;
+    });
+    section.style.display = anyVisible ? "" : "none";
+  });
+}
+</script>
+</body>
+</html>
