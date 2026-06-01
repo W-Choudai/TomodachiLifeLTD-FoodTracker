@@ -23,16 +23,39 @@ def category_score(prefs_in_category):
 
 
 def index(request):
-    miis = Mii.objects.all()
+    miis = Mii.objects.prefetch_related("preferences__food__food_category").all()
+
+    mii_data = []
+    for mii in miis:
+        prefs = mii.preferences.all()
+        score = mii.happiness_score()
+
+        cat_counts = {}
+        fave_food = None
+        for p in prefs:
+            cat = p.food.food_category.name if p.food.food_category else "Uncategorized"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+            if p.preference == "Absolutely Love" and not fave_food:
+                fave_food = p.food.name
+
+        top_cat = max(cat_counts, key=cat_counts.get) if cat_counts else None
+
+        mii_data.append({
+            "id":      mii.id,
+            "name":    mii.name,
+            "score":   score,
+            "total":   prefs.count(),
+            "top_cat": top_cat,
+            "fave":    fave_food,
+        })
+
     return render(request, "tomodachi/index.html", {
-        "miis": miis,
-        "prefs": PREFS,
+        "mii_data": mii_data,
     })
 
 
 def mii_detail(request, mii_id):
     mii   = get_object_or_404(Mii, id=mii_id)
-    miis  = Mii.objects.all()
     foods = Food.objects.select_related("food_category").order_by("food_category__name", "name")
 
     existing_prefs = {p.food_id: p.preference for p in mii.preferences.select_related("food")}
@@ -44,11 +67,11 @@ def mii_detail(request, mii_id):
             categories[cat_name] = {"foods": [], "prefs_list": []}
         pref = existing_prefs.get(food.id)
         categories[cat_name]["foods"].append({
-            "id":         food.id,
-            "name":       food.name,
-            "icon":       food.icon or "",
-            "flavor":     food.flavor_type or "",
-            "preference": pref,
+            "id":          food.id,
+            "name":        food.name,
+            "icon":        food.icon or "",
+            "flavor":      food.flavor_type or "",
+            "preference":  pref,
             "temperature": food.temperature or "",
         })
         categories[cat_name]["prefs_list"].append(pref)
@@ -57,14 +80,11 @@ def mii_detail(request, mii_id):
         tried = [p for p in data["prefs_list"] if p is not None]
         data["score"] = round(sum(PREFERENCE_WEIGHTS[p] for p in tried) / len(tried), 2) if tried else None
 
-    total_set = len(existing_prefs)
-
-    return render(request, "tomodachi/index.html", {
-        "miis":       miis,
+    return render(request, "tomodachi/mii_detail.html", {
         "active_mii": mii,
         "categories": categories,
         "prefs":      PREFS,
-        "total_set":  total_set,
+        "total_set":  len(existing_prefs),
     })
 
 @require_POST
